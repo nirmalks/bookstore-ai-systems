@@ -3,11 +3,7 @@ x-java-service-defaults: &java-service-defaults
   mem_limit: 768m
   environment:
     JAVA_TOOL_OPTIONS: >-
-      -XX:InitialRAMPercentage=25
-      -XX:MinRAMPercentage=20
-      -XX:MaxRAMPercentage=60
-      -XX:+UseG1GC
-      -XX:+ExitOnOutOfMemoryError
+      -XX:InitialRAMPercentage=25 -XX:MinRAMPercentage=20 -XX:MaxRAMPercentage=60 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError
 
 x-db-service-defaults: &db-service-defaults
   cpus: 0.75
@@ -23,15 +19,7 @@ services:
     <<: *db-service-defaults
     image: postgres:15
     command: >
-      postgres
-      -c shared_buffers=128MB
-      -c work_mem=16MB
-      -c effective_cache_size=256MB
-      -c random_page_cost=1.1
-      -c max_connections=50
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      postgres -c shared_buffers=128MB -c work_mem=16MB -c effective_cache_size=256MB -c random_page_cost=1.1 -c max_connections=50 -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB
     environment:
       POSTGRES_DB: bookstore_user_service_db
       POSTGRES_USER: postgres
@@ -105,15 +93,7 @@ services:
     <<: *db-service-defaults
     image: postgres:15
     command: >
-      postgres
-      -c shared_buffers=128MB
-      -c work_mem=16MB
-      -c effective_cache_size=256MB
-      -c random_page_cost=1.1
-      -c max_connections=60
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      postgres -c shared_buffers=128MB -c work_mem=16MB -c effective_cache_size=256MB -c random_page_cost=1.1 -c max_connections=60 -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB
     environment:
       POSTGRES_DB: bookstore_checkout_service_db
       POSTGRES_USER: postgres
@@ -133,15 +113,7 @@ services:
     <<: *db-service-defaults
     image: postgres:15
     command: >
-      postgres
-      -c shared_buffers=128MB
-      -c work_mem=16MB
-      -c effective_cache_size=256MB
-      -c random_page_cost=1.1
-      -c max_connections=50
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      postgres -c shared_buffers=128MB -c work_mem=16MB -c effective_cache_size=256MB -c random_page_cost=1.1 -c max_connections=50 -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB
     environment:
       POSTGRES_DB: bookstore_notification_service_db
       POSTGRES_USER: postgres
@@ -161,16 +133,7 @@ services:
     <<: *db-service-defaults
     image: postgres:15
     command: >
-      postgres
-      -c shared_buffers=128MB
-      -c work_mem=16MB
-      -c effective_cache_size=256MB
-      -c random_page_cost=1.1
-      -c max_connections=50
-      -c maintenance_work_mem=64MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c synchronous_commit=off
+      postgres -c shared_buffers=128MB -c work_mem=16MB -c effective_cache_size=256MB -c random_page_cost=1.1 -c max_connections=50 -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c synchronous_commit=off
     environment:
       POSTGRES_DB: bookstore_audit_service_db
       POSTGRES_USER: postgres
@@ -190,7 +153,6 @@ services:
     cpus: 1.00
     mem_limit: 512m
     image: rabbitmq:4-management
-    container_name: rabbitmq-dev
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -224,7 +186,6 @@ services:
     cpus: 0.50
     mem_limit: 256m
     image: hashicorp/vault:1.15
-    container_name: vault
     ports:
       - "8206:8200"
     cap_add:
@@ -647,7 +608,6 @@ services:
     cpus: 0.50
     mem_limit: 256m
     image: hashicorp/vault:1.15
-    container_name: vault-init
     depends_on:
       vault:
         condition: service_started
@@ -674,7 +634,6 @@ services:
     cpus: 0.25
     mem_limit: 128m
     image: alpine
-    container_name: vault-cert-generator
     volumes:
       - ./vault/certs:/vault/certs
     command: sh -c "apk add --no-cache openssl && mkdir -p /vault/certs && if [ ! -f /vault/certs/vault.crt ] || ! openssl x509 -in /vault/certs/vault.crt -noout -text | grep -q 'DNS:vault'; then openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj \"/C=US/ST=State/L=City/O=Organization/CN=vault\" -addext \"subjectAltName=DNS:vault,DNS:localhost,IP:127.0.0.1\" -keyout /vault/certs/vault.key -out /vault/certs/vault.crt && openssl pkcs12 -export -in /vault/certs/vault.crt -inkey /vault/certs/vault.key -out /vault/certs/vault.truststore.p12 -name vault -passout pass:changeit; fi; chmod 644 /vault/certs/vault.key; chmod 644 /vault/certs/vault.crt; chmod 640 /vault/certs/vault.truststore.p12"
