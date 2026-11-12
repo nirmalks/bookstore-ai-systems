@@ -259,7 +259,7 @@ class BookServiceImplTest {
 
 	@Test
 	void getFilteredBooks_will_return_filtered_books_successfully() {
-		when(bookRepository.findAll(any(Specification.class), any(Pageable.class)))
+		when(bookRepository.searchBooksFullText(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
 			.thenReturn(new PageImpl<>(List.of(book)));
 		Page<BookDto> bookDto = bookService.getFilteredBooks("search", "genre", LocalDate.now(), LocalDate.now(), 10.0,
 				10.0, "id", "asc", 0, 10);

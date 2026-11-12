@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import locking.DistributedLockService;
 import locking.RedissonConfig;
 
-@SpringBootApplication(exclude = { org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class })
+@SpringBootApplication
 @Import({ RedissonConfig.class, DistributedLockService.class })
 @EnableDiscoveryClient
 @EnableRabbit

@@ -36,6 +36,7 @@ public interface BookService {
 
 	/**
 	 * Reserve stock for a book. Used by saga for inventory reservation step.
+	 * 
 	 * @throws InsufficientStockException if not enough stock available
 	 */
 	void reserveStock(Long bookId, int quantity) throws InsufficientStockException;

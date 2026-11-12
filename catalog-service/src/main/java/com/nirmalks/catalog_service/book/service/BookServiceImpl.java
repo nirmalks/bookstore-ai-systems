@@ -71,8 +71,7 @@ public class BookServiceImpl implements BookService {
 		try {
 			Pageable pageable = RequestUtils.getPageable(pageRequestDto);
 			return new RestPage<>(bookRepository.findAll(pageable).map(BookMapper::toDTO));
-		}
-		finally {
+		} finally {
 			bookMetrics.stopBookQueryTimer(sample);
 		}
 	}
@@ -83,8 +82,8 @@ public class BookServiceImpl implements BookService {
 	public BookDto getBookById(Long id) {
 		bookMetrics.incrementBookViews();
 		return bookRepository.findById(id)
-			.map(BookMapper::toDTO)
-			.orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+				.map(BookMapper::toDTO)
+				.orElseThrow(() -> new ResourceNotFoundException("Book not found"));
 	}
 
 	@Override
@@ -103,7 +102,7 @@ public class BookServiceImpl implements BookService {
 	@Auditable(action = "UPDATE_BOOK", resource = "BOOK", resourceId = "#id", detail = "catalog update")
 	public BookDto updateBook(Long id, BookRequest bookRequest) {
 		var existingBook = bookRepository.findById(id)
-			.orElseThrow(() -> new ResourceNotFoundException("book not found"));
+				.orElseThrow(() -> new ResourceNotFoundException("book not found"));
 		var authors = authorService.getAuthorsByIds(bookRequest.authorIds());
 		var genres = genreService.getGenresByIds(bookRequest.genreIds());
 		return BookMapper.toDTO(bookRepository.save(BookMapper.toEntity(existingBook, bookRequest, authors, genres)));
@@ -141,7 +140,7 @@ public class BookServiceImpl implements BookService {
 	@Auditable(action = "UPDATE_BOOK_STOCK", resource = "BOOK", resourceId = "#bookId", detail = "manual stock update")
 	public void updateBookStock(Long bookId, int quantity) {
 		var book = bookRepository.findById(bookId)
-			.orElseThrow(() -> new ResourceNotFoundException("Book not found with ID: " + bookId));
+				.orElseThrow(() -> new ResourceNotFoundException("Book not found with ID: " + bookId));
 		book.setStock(quantity);
 		bookRepository.save(book);
 
@@ -156,20 +155,31 @@ public class BookServiceImpl implements BookService {
 	public Page<BookDto> getFilteredBooks(String search, String genre, LocalDate startDate, LocalDate endDate,
 			Double minPrice, Double maxPrice, String sortBy, String sortOrder, int page, int size) {
 		Pageable pageable = PageRequest.of(page, size);
+
+		if (search != null && !search.isBlank()) {
+			String trimmedQuery = search.trim();
+			if (trimmedQuery.length() > 255) {
+				throw new IllegalArgumentException("Search query exceeds maximum length of 255 characters");
+			}
+			return bookRepository
+					.searchBooksFullText(trimmedQuery, genre, startDate, endDate, minPrice, maxPrice, pageable)
+					.map(BookMapper::toDTO);
+		}
+
 		Specification<Book> specification = BookSpecification.filterBy(search, genre, startDate, endDate, minPrice,
 				maxPrice, sortBy, sortOrder);
 		return bookRepository.findAll(specification, pageable).map(BookMapper::toDTO);
-
 	}
 
 	/**
-	 * @deprecated Use {@link #reserveStock(Long, int)} instead for saga support. This
-	 * method will be removed in a future release.
+	 * @deprecated Use {@link #reserveStock(Long, int)} instead for saga support.
+	 *             This
+	 *             method will be removed in a future release.
 	 */
 	@Deprecated
 	@Transactional
-	@Caching(
-			evict = { @CacheEvict(value = "books", allEntries = true), @CacheEvict(value = "book", allEntries = true) })
+	@Caching(evict = { @CacheEvict(value = "books", allEntries = true),
+			@CacheEvict(value = "book", allEntries = true) })
 	public void updateStock(OrderMessage orderMessage) {
 		orderMessage.items().forEach(item -> {
 
@@ -205,7 +215,7 @@ public class BookServiceImpl implements BookService {
 
 		distributedLockService.executeWithLock(lockKey, 5, 30, TimeUnit.SECONDS, () -> {
 			Book book = bookRepository.findById(bookId)
-				.orElseThrow(() -> new ResourceNotFoundException("Book not found: " + bookId));
+					.orElseThrow(() -> new ResourceNotFoundException("Book not found: " + bookId));
 
 			if (book.getStock() < quantity) {
 				bookMetrics.incrementStockReservationFailure();
