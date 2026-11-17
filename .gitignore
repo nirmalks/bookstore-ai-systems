@@ -52,3 +52,7 @@ vault/approles/*.env
 vault/approles/*.properties
 vault/certs/*.key
 vault/certs/*.p12
+
+### Internal Documentation ###
+internal-docs/
+

@@ -1,15 +1,24 @@
 package com.nirmalks.checkout_service.order.entity;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dto.OrderMessage;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "outbox")
 public class Outbox {
+
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+			.registerModule(new JavaTimeModule())
+			.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,7 +35,7 @@ public class Outbox {
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "payload", columnDefinition = "JSONB", nullable = false)
-	private OrderMessage payload;
+	private JsonNode payload;
 
 	@Enumerated(EnumType.STRING)
 	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
@@ -36,16 +45,26 @@ public class Outbox {
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt = LocalDateTime.now();
 
+	@Column(name = "locked_until")
+	private Instant lockedUntil;
+
+	@Column(name = "retry_count", nullable = false)
+	private int retryCount = 0;
+
+	@Column(name = "next_retry_at")
+	private Instant nextRetryAt;
+
 	public enum EventStatus {
 
-		PENDING, SENT, FAILED
+		PENDING, IN_PROGRESS, SENT, FAILED
 
 	}
 
-	public Outbox(String aggregateId, String eventType, OrderMessage payload) {
+
+	public Outbox(String aggregateId, String eventType, Object payload) {
 		this.aggregateId = aggregateId;
 		this.eventType = eventType;
-		this.payload = payload;
+		setPayload(payload);
 	}
 
 	public Outbox() {
@@ -84,11 +103,33 @@ public class Outbox {
 	}
 
 	public OrderMessage getPayload() {
+		return getPayloadAs(OrderMessage.class);
+	}
+
+	public JsonNode getRawPayload() {
 		return payload;
 	}
 
-	public void setPayload(OrderMessage payload) {
-		this.payload = payload;
+
+	public <T> T getPayloadAs(Class<T> clazz) {
+		if (this.payload == null) {
+			return null;
+		}
+		try {
+			return OBJECT_MAPPER.treeToValue(this.payload, clazz);
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to deserialize outbox payload to " + clazz.getSimpleName(), e);
+		}
+	}
+
+	public void setPayload(Object payload) {
+		if (payload == null) {
+			this.payload = null;
+		} else if (payload instanceof JsonNode jsonNode) {
+			this.payload = jsonNode;
+		} else {
+			this.payload = OBJECT_MAPPER.valueToTree(payload);
+		}
 	}
 
 	public EventStatus getStatus() {
@@ -105,6 +146,34 @@ public class Outbox {
 
 	public void setCreatedAt(LocalDateTime createdAt) {
 		this.createdAt = createdAt;
+	}
+
+
+	public Instant getLockedUntil() {
+		return lockedUntil;
+	}
+
+
+	public void setLockedUntil(Instant lockedUntil) {
+		this.lockedUntil = lockedUntil;
+	}
+
+	public int getRetryCount() {
+		return retryCount;
+	}
+
+	public void setRetryCount(int retryCount) {
+		this.retryCount = retryCount;
+	}
+
+
+	public Instant getNextRetryAt() {
+		return nextRetryAt;
+	}
+
+
+	public void setNextRetryAt(Instant nextRetryAt) {
+		this.nextRetryAt = nextRetryAt;
 	}
 
 }
