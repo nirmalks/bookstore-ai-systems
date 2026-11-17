@@ -1,13 +1,15 @@
 package com.nirmalks.catalog_service.idempotency.repository;
 
 import com.nirmalks.catalog_service.idempotency.entity.ProcessedEvent;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 
 /**
- * Repository for managing processed event records. Used to check for duplicate events and
+ * Repository for managing processed event records. Used to check for duplicate
+ * events and
  * record successfully processed events.
  */
 @Repository
@@ -15,17 +17,44 @@ public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, 
 
 	/**
 	 * Check if an event has already been processed.
+	 * 
 	 * @param eventId the unique event identifier
 	 * @return true if the event has been processed, false otherwise
 	 */
 	boolean existsByEventId(String eventId);
 
 	/**
-	 * Delete old processed events to prevent unbounded table growth. Events older than
-	 * the specified cutoff time will be removed.
+	 * Delete old processed events to prevent unbounded table growth. Events older
+	 * than the
+	 * specified cutoff time will be removed.
+	 * 
 	 * @param cutoffTime events processed before this time will be deleted
 	 * @return number of deleted records
 	 */
 	long deleteByProcessedAtBefore(Instant cutoffTime);
+
+	/**
+	 * Atomically inserts a processed event. Returns true if successfully inserted
+	 * (first execution),
+	 * or false if duplicate exists (either via pre-check or unique primary key
+	 * conflict).
+	 *
+	 * @param eventId     unique event identifier
+	 * @param eventType   type of event
+	 * @param processedAt timestamp of processing
+	 * @return true if new event, false if duplicate
+	 */
+
+	default boolean insertIfAbsent(String eventId, String eventType, Instant processedAt) {
+		if (existsByEventId(eventId)) {
+			return false;
+		}
+		try {
+			saveAndFlush(new ProcessedEvent(eventId, eventType, processedAt));
+			return true;
+		} catch (DataIntegrityViolationException e) {
+			return false;
+		}
+	}
 
 }

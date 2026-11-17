@@ -19,8 +19,7 @@ public class Book {
 	private String title;
 
 	@ManyToMany
-	@JoinTable(name = "book_author", joinColumns = @JoinColumn(name = "book_id"),
-			inverseJoinColumns = @JoinColumn(name = "author_id"))
+	@JoinTable(name = "book_author", joinColumns = @JoinColumn(name = "book_id"), inverseJoinColumns = @JoinColumn(name = "author_id"))
 	private List<Author> authors;
 
 	@Column(nullable = false)
@@ -53,8 +52,7 @@ public class Book {
 	private String description;
 
 	@ManyToMany
-	@JoinTable(name = "book_genre", joinColumns = @JoinColumn(name = "book_id"),
-			inverseJoinColumns = @JoinColumn(name = "genre_id"))
+	@JoinTable(name = "book_genre", joinColumns = @JoinColumn(name = "book_id"), inverseJoinColumns = @JoinColumn(name = "genre_id"))
 	private List<Genre> genres;
 
 	public List<Genre> getGenres() {
@@ -137,6 +135,17 @@ public class Book {
 
 	public void setPublishedDate(LocalDate publishedDate) {
 		this.publishedDate = publishedDate;
+	}
+
+	@Column(name = "purchase_count", nullable = false)
+	private int purchaseCount = 0;
+
+	public int getPurchaseCount() {
+		return purchaseCount;
+	}
+
+	public void setPurchaseCount(int purchaseCount) {
+		this.purchaseCount = purchaseCount;
 	}
 
 }

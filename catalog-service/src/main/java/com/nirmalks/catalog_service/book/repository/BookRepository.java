@@ -34,13 +34,17 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 	@Query("UPDATE Book b SET b.stock = b.stock + :quantity WHERE b.id = :bookId")
 	int incrementStock(@Param("bookId") Long bookId, @Param("quantity") int quantity);
 
+	@Modifying
+	@Query("UPDATE Book b SET b.purchaseCount = b.purchaseCount + :quantity WHERE b.id = :bookId")
+	int incrementPurchaseCount(@Param("bookId") Long bookId, @Param("quantity") int quantity);
+
 	@Query(value = """
 			WITH search_query AS (
 			    SELECT websearch_to_tsquery('english', CAST(:query AS text)) AS tsq
 			)
 			SELECT b.*,
 			       (b.search_vector @@ sq.tsq) AS book_match,
-			       CASE 
+			       CASE
 			           WHEN b.search_vector @@ sq.tsq THEN ts_rank(b.search_vector, sq.tsq)
 			           ELSE 0
 			       END AS rank
@@ -71,8 +75,7 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 			  AND (CAST(:minPrice AS numeric) IS NULL OR b.price >= CAST(:minPrice AS numeric))
 			  AND (CAST(:maxPrice AS numeric) IS NULL OR b.price <= CAST(:maxPrice AS numeric))
 			ORDER BY book_match DESC, rank DESC, b.id ASC
-			""",
-			countQuery = """
+			""", countQuery = """
 			WITH search_query AS (
 			    SELECT websearch_to_tsquery('english', CAST(:query AS text)) AS tsq
 			)
@@ -103,8 +106,7 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 			  AND (CAST(:endDate AS date) IS NULL OR b.published_date <= CAST(:endDate AS date))
 			  AND (CAST(:minPrice AS numeric) IS NULL OR b.price >= CAST(:minPrice AS numeric))
 			  AND (CAST(:maxPrice AS numeric) IS NULL OR b.price <= CAST(:maxPrice AS numeric))
-			""",
-			nativeQuery = true)
+			""", nativeQuery = true)
 	Page<Book> searchBooksFullText(@Param("query") String query, @Param("genre") String genre,
 			@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate,
 			@Param("minPrice") Double minPrice, @Param("maxPrice") Double maxPrice, Pageable pageable);

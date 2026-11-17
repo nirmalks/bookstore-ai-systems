@@ -29,4 +29,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
 	Optional<Order> findBySagaId(String sagaId);
 
+	@Query("SELECT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id = :id")
+	Optional<Order> findByIdWithItems(@Param("id") Long id);
+
 }

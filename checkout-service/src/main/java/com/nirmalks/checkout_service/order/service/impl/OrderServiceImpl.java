@@ -80,8 +80,7 @@ public class OrderServiceImpl implements OrderService {
 
 	@Override
 	@Transactional
-	@Auditable(action = "CREATE_ORDER_DIRECT", resource = "ORDER", resourceId = "#result.order.id",
-			detail = "checkout direct order")
+	@Auditable(action = "CREATE_ORDER_DIRECT", resource = "ORDER", resourceId = "#result.order.id", detail = "checkout direct order")
 	public OrderResponse createOrder(DirectOrderRequest directOrderRequest) {
 		orderMetrics.incrementCheckoutInitiated();
 		Timer.Sample sample = orderMetrics.startOrderCreationTimer();
@@ -99,11 +98,11 @@ public class OrderServiceImpl implements OrderService {
 
 			ExecutorService executor = Executors.newFixedThreadPool(8);
 			List<CompletableFuture<OrderItem>> orderItemFutures = itemDtos.stream()
-				.map(itemDto -> CompletableFuture.supplyAsync(() -> {
-					var book = catalogServiceClient.getBook(itemDto.bookId());
-					return OrderMapper.toOrderItemEntity(book, itemDto, order);
-				}, executor))
-				.toList();
+					.map(itemDto -> CompletableFuture.supplyAsync(() -> {
+						var book = catalogServiceClient.getBook(itemDto.bookId());
+						return OrderMapper.toOrderItemEntity(book, itemDto, order);
+					}, executor))
+					.toList();
 			List<OrderItem> orderItems = orderItemFutures.stream().map(CompletableFuture::join).toList();
 			executor.shutdown();
 			order.setItems(orderItems);
@@ -116,8 +115,8 @@ public class OrderServiceImpl implements OrderService {
 			orderItemRepository.saveAll(orderItems);
 
 			List<OrderItemPayload> itemPayloads = orderItems.stream()
-				.map(item -> new OrderItemPayload(item.getBookId(), item.getQuantity()))
-				.toList();
+					.map(item -> new OrderItemPayload(item.getBookId(), item.getQuantity()))
+					.toList();
 
 			OrderMessage message = new OrderMessage(null, sagaId, savedOrder.getId().toString(), user.id(),
 					user.email(), savedOrder.getTotalCost(), savedOrder.getPlacedDate(), itemPayloads);
@@ -130,13 +129,11 @@ public class OrderServiceImpl implements OrderService {
 			orderMetrics.recordRevenue(savedOrder.getTotalCost());
 
 			return OrderMapper.toResponse(user, savedOrder, "Order placed successfully.");
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			orderMetrics.incrementOrdersFailed();
 			sagaMetrics.incrementSagasFailed();
 			throw e;
-		}
-		finally {
+		} finally {
 			orderMetrics.stopOrderCreationTimer(sample);
 		}
 	}
@@ -154,18 +151,16 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
-	@Auditable(action = "UPDATE_ORDER_STATUS", resource = "ORDER", resourceId = "#orderId",
-			detail = "manual order status update")
+	@Auditable(action = "UPDATE_ORDER_STATUS", resource = "ORDER", resourceId = "#orderId", detail = "manual order status update")
 	public void updateOrderStatus(Long orderId, OrderStatus status) {
 		Order order = orderRepository.findById(orderId)
-			.orElseThrow(() -> new IllegalArgumentException("Order not found"));
+				.orElseThrow(() -> new IllegalArgumentException("Order not found"));
 		order.setOrderStatus(status);
 		orderRepository.save(order);
 	}
 
 	@Transactional
-	@Auditable(action = "UPDATE_ORDER_STATUS_EVENT", resource = "ORDER", resourceId = "#orderIdString",
-			detail = "saga event order status update")
+	@Auditable(action = "UPDATE_ORDER_STATUS_EVENT", resource = "ORDER", resourceId = "#orderIdString", detail = "saga event order status update")
 	public void updateOrderStatusByEvent(String orderIdString, OrderStatus newStatus, String reason) {
 		String lockKey = LockKeys.orderStatus(orderIdString);
 
@@ -176,8 +171,9 @@ public class OrderServiceImpl implements OrderService {
 	private void doUpdateOrderStatus(String orderIdString, OrderStatus newStatus, String reason) {
 		try {
 			Long orderId = Long.valueOf(orderIdString);
-			Order order = orderRepository.findById(orderId)
-				.orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+			Order order = orderRepository.findByIdWithItems(orderId)
+					.orElseGet(() -> orderRepository.findById(orderId)
+							.orElseThrow(() -> new RuntimeException("Order not found: " + orderId)));
 
 			if (order.getOrderStatus() == OrderStatus.CANCELLED || order.getOrderStatus() == OrderStatus.CONFIRMED) {
 				logger.warn("Order {} is already {}, ignoring update to {}", orderId, order.getOrderStatus(),
@@ -188,8 +184,11 @@ public class OrderServiceImpl implements OrderService {
 			order.setOrderStatus(newStatus);
 			orderRepository.save(order);
 			logger.info("Updated Order {} status to {}. Reason: {}", orderId, newStatus, reason);
-		}
-		catch (Exception e) {
+
+			if (newStatus == OrderStatus.CONFIRMED) {
+				outboxService.saveOrderCompletedEvent(order);
+			}
+		} catch (Exception e) {
 			logger.error("Failed to update order status for ID: {}", orderIdString, e);
 			throw e;
 		}
