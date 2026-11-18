@@ -45,11 +45,16 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 			SELECT b.*,
 			       (b.search_vector @@ sq.tsq) AS book_match,
 			       CASE
-			           WHEN b.search_vector @@ sq.tsq THEN ts_rank(b.search_vector, sq.tsq)
-			           ELSE 0
-			       END AS rank
+			           WHEN b.search_vector @@ sq.tsq THEN
+			               (ts_rank(b.search_vector, sq.tsq, 32) * 0.7 + popularity.score * 0.3)
+			           ELSE
+			               (popularity.score * 0.1)
+			       END AS search_score
 			FROM book b
 			CROSS JOIN search_query sq
+			CROSS JOIN LATERAL (
+			    SELECT ln(b.purchase_count + 1) / (1.0 + ln(b.purchase_count + 1)) AS score
+			) popularity
 			WHERE (
 			    b.search_vector @@ sq.tsq
 			    OR EXISTS (
@@ -74,7 +79,7 @@ public interface BookRepository extends JpaRepository<Book, Long>, JpaSpecificat
 			  AND (CAST(:endDate AS date) IS NULL OR b.published_date <= CAST(:endDate AS date))
 			  AND (CAST(:minPrice AS numeric) IS NULL OR b.price >= CAST(:minPrice AS numeric))
 			  AND (CAST(:maxPrice AS numeric) IS NULL OR b.price <= CAST(:maxPrice AS numeric))
-			ORDER BY book_match DESC, rank DESC, b.id ASC
+			ORDER BY book_match DESC, search_score DESC, b.id ASC
 			""", countQuery = """
 			WITH search_query AS (
 			    SELECT websearch_to_tsquery('english', CAST(:query AS text)) AS tsq
