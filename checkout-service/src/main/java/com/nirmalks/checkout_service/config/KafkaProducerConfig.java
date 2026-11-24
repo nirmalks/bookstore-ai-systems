@@ -2,6 +2,7 @@ package com.nirmalks.checkout_service.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dto.events.OrderCompletedEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,11 +10,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.MicrometerProducerListener;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Configuration
 public class KafkaProducerConfig {
@@ -34,7 +37,9 @@ public class KafkaProducerConfig {
 	private int deliveryTimeoutMs;
 
 	@Bean
-	public ProducerFactory<String, OrderCompletedEvent> orderCompletedProducerFactory(ObjectMapper objectMapper) {
+
+	public ProducerFactory<String, OrderCompletedEvent> orderCompletedProducerFactory(ObjectMapper objectMapper,
+			Optional<MeterRegistry> meterRegistry) {
 		Map<String, Object> props = new HashMap<>();
 		props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 		props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -57,7 +62,14 @@ public class KafkaProducerConfig {
 		JsonSerializer<OrderCompletedEvent> serializer = new JsonSerializer<>(objectMapper);
 		serializer.setAddTypeInfo(false);
 
-		return new DefaultKafkaProducerFactory<>(props, new StringSerializer(), serializer);
+		DefaultKafkaProducerFactory<String, OrderCompletedEvent> factory = new DefaultKafkaProducerFactory<>(props,
+				new StringSerializer(), serializer);
+		meterRegistry.ifPresent(registry -> factory.addListener(new MicrometerProducerListener<>(registry)));
+		return factory;
+	}
+
+	public ProducerFactory<String, OrderCompletedEvent> orderCompletedProducerFactory(ObjectMapper objectMapper) {
+		return orderCompletedProducerFactory(objectMapper, Optional.empty());
 	}
 
 	@Bean

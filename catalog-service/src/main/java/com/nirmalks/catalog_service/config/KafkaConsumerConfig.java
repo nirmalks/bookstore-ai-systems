@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dto.events.InvalidEventException;
 import dto.events.OrderCompletedEvent;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
@@ -22,6 +23,8 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.MicrometerConsumerListener;
+import org.springframework.kafka.core.MicrometerProducerListener;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -36,6 +39,7 @@ import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Configuration
 @EnableKafka
@@ -54,7 +58,8 @@ public class KafkaConsumerConfig {
 	private int concurrency;
 
 	@Bean
-	public ConsumerFactory<String, OrderCompletedEvent> orderCompletedConsumerFactory() {
+	public ConsumerFactory<String, OrderCompletedEvent> orderCompletedConsumerFactory(
+			Optional<MeterRegistry> meterRegistry) {
 		ObjectMapper consumerMapper = new ObjectMapper();
 		consumerMapper.registerModule(new JavaTimeModule());
 		consumerMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -77,11 +82,19 @@ public class KafkaConsumerConfig {
 		props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
 		props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, maxPollIntervalMs);
 
-		return new DefaultKafkaConsumerFactory<>(props, errorHandlingKeyDeserializer, errorHandlingValueDeserializer);
+		DefaultKafkaConsumerFactory<String, OrderCompletedEvent> factory = new DefaultKafkaConsumerFactory<>(props,
+				errorHandlingKeyDeserializer, errorHandlingValueDeserializer);
+		meterRegistry.ifPresent(registry -> factory.addListener(new MicrometerConsumerListener<>(registry)));
+		return factory;
+	}
+
+	public ConsumerFactory<String, OrderCompletedEvent> orderCompletedConsumerFactory() {
+		return orderCompletedConsumerFactory(Optional.empty());
 	}
 
 	@Bean
-	public ProducerFactory<Object, Object> dltProducerFactory(ObjectMapper objectMapper) {
+	public ProducerFactory<Object, Object> dltProducerFactory(ObjectMapper objectMapper,
+			Optional<MeterRegistry> meterRegistry) {
 		Map<String, Object> props = new HashMap<>();
 		props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
@@ -91,13 +104,21 @@ public class KafkaConsumerConfig {
 		keyDelegates.put(byte[].class, new ByteArraySerializer());
 		DelegatingByTypeSerializer keySerializer = new DelegatingByTypeSerializer(keyDelegates);
 
-		// Delegating Value Serializer: handles raw byte[] poison messages and OrderCompletedEvent
+		// Delegating Value Serializer: handles raw byte[] poison messages and //
+		// OrderCompletedEvent
 		Map<Class<?>, Serializer<?>> valueDelegates = new HashMap<>();
 		valueDelegates.put(byte[].class, new ByteArraySerializer());
 		valueDelegates.put(OrderCompletedEvent.class, new JsonSerializer<>(objectMapper));
 		DelegatingByTypeSerializer valueSerializer = new DelegatingByTypeSerializer(valueDelegates);
 
-		return new DefaultKafkaProducerFactory<>(props, keySerializer, valueSerializer);
+		DefaultKafkaProducerFactory<Object, Object> factory = new DefaultKafkaProducerFactory<>(props, keySerializer,
+				valueSerializer);
+		meterRegistry.ifPresent(registry -> factory.addListener(new MicrometerProducerListener<>(registry)));
+		return factory;
+	}
+
+	public ProducerFactory<Object, Object> dltProducerFactory(ObjectMapper objectMapper) {
+		return dltProducerFactory(objectMapper, Optional.empty());
 	}
 
 	@Bean

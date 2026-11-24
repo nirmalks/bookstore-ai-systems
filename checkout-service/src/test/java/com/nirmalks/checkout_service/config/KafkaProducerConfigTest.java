@@ -28,8 +28,7 @@ class KafkaProducerConfigTest {
         ProducerFactory<String, OrderCompletedEvent> factory = config.orderCompletedProducerFactory(new ObjectMapper());
         assertThat(factory).isInstanceOf(DefaultKafkaProducerFactory.class);
 
-        DefaultKafkaProducerFactory<String, OrderCompletedEvent> defaultFactory =
-                (DefaultKafkaProducerFactory<String, OrderCompletedEvent>) factory;
+        DefaultKafkaProducerFactory<String, OrderCompletedEvent> defaultFactory = (DefaultKafkaProducerFactory<String, OrderCompletedEvent>) factory;
 
         Map<String, Object> props = defaultFactory.getConfigurationProperties();
 
@@ -53,5 +52,24 @@ class KafkaProducerConfigTest {
         // 6. Throughput batching: linger.ms = 20ms and batch.size = 32KB
         assertThat(props.get(ProducerConfig.LINGER_MS_CONFIG)).isEqualTo(20);
         assertThat(props.get(ProducerConfig.BATCH_SIZE_CONFIG)).isEqualTo(32768);
+    }
+
+    @Test
+    @DisplayName("Verify Micrometer producer listener registration when MeterRegistry is present")
+    void shouldRegisterMicrometerProducerListener() {
+        KafkaProducerConfig config = new KafkaProducerConfig();
+        ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9094");
+        ReflectionTestUtils.setField(config, "compressionType", "snappy");
+        ReflectionTestUtils.setField(config, "lingerMs", 20);
+        ReflectionTestUtils.setField(config, "batchSize", 32768);
+        ReflectionTestUtils.setField(config, "deliveryTimeoutMs", 120000);
+
+        io.micrometer.core.instrument.MeterRegistry meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        ProducerFactory<String, OrderCompletedEvent> factory = config.orderCompletedProducerFactory(new ObjectMapper(),
+                java.util.Optional.of(meterRegistry));
+
+        DefaultKafkaProducerFactory<String, OrderCompletedEvent> defaultFactory = (DefaultKafkaProducerFactory<String, OrderCompletedEvent>) factory;
+
+        assertThat(defaultFactory.getListeners()).isNotEmpty();
     }
 }

@@ -50,8 +50,8 @@ class KafkaConsumerConfigTest {
 		ConsumerFactory<String, OrderCompletedEvent> consumerFactory = mock(ConsumerFactory.class);
 		DefaultErrorHandler errorHandler = mock(DefaultErrorHandler.class);
 
-		ConcurrentKafkaListenerContainerFactory<String, OrderCompletedEvent> containerFactory =
-				config.kafkaListenerContainerFactory(consumerFactory, errorHandler);
+		ConcurrentKafkaListenerContainerFactory<String, OrderCompletedEvent> containerFactory = config
+				.kafkaListenerContainerFactory(consumerFactory, errorHandler);
 
 		Object concurrency = ReflectionTestUtils.getField(containerFactory, "concurrency");
 		assertThat(concurrency).isEqualTo(3);
@@ -70,5 +70,28 @@ class KafkaConsumerConfigTest {
 
 		Object commitRecovered = ReflectionTestUtils.getField(errorHandler, "commitRecovered");
 		assertThat(commitRecovered).isEqualTo(true);
+	}
+
+	@Test
+	@DisplayName("Should attach Micrometer consumer and producer listeners when MeterRegistry is present")
+	void shouldAttachMicrometerListenersWhenRegistryPresent() {
+		KafkaConsumerConfig config = new KafkaConsumerConfig();
+		ReflectionTestUtils.setField(config, "bootstrapServers", "localhost:9092");
+		ReflectionTestUtils.setField(config, "maxPollRecords", 50);
+		ReflectionTestUtils.setField(config, "maxPollIntervalMs", 300000);
+
+		io.micrometer.core.instrument.MeterRegistry meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+
+		ConsumerFactory<String, OrderCompletedEvent> consumerFactory = config
+				.orderCompletedConsumerFactory(java.util.Optional.of(meterRegistry));
+		org.springframework.kafka.core.DefaultKafkaConsumerFactory<String, OrderCompletedEvent> defaultConsumerFactory = (org.springframework.kafka.core.DefaultKafkaConsumerFactory<String, OrderCompletedEvent>) consumerFactory;
+
+		assertThat(defaultConsumerFactory.getListeners()).isNotEmpty();
+
+		org.springframework.kafka.core.ProducerFactory<Object, Object> producerFactory = config.dltProducerFactory(
+				new com.fasterxml.jackson.databind.ObjectMapper(), java.util.Optional.of(meterRegistry));
+		org.springframework.kafka.core.DefaultKafkaProducerFactory<Object, Object> defaultProducerFactory = (org.springframework.kafka.core.DefaultKafkaProducerFactory<Object, Object>) producerFactory;
+
+		assertThat(defaultProducerFactory.getListeners()).isNotEmpty();
 	}
 }
