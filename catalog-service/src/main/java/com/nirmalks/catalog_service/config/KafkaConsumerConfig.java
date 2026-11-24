@@ -44,6 +44,15 @@ public class KafkaConsumerConfig {
 	@Value("${spring.kafka.bootstrap-servers:localhost:9094}")
 	private String bootstrapServers;
 
+	@Value("${spring.kafka.consumer.max-poll-records:50}")
+	private int maxPollRecords;
+
+	@Value("${spring.kafka.consumer.properties.max.poll.interval.ms:300000}")
+	private int maxPollIntervalMs;
+
+	@Value("${spring.kafka.listener.concurrency:3}")
+	private int concurrency;
+
 	@Bean
 	public ConsumerFactory<String, OrderCompletedEvent> orderCompletedConsumerFactory() {
 		ObjectMapper consumerMapper = new ObjectMapper();
@@ -65,6 +74,8 @@ public class KafkaConsumerConfig {
 		props.put(ConsumerConfig.GROUP_ID_CONFIG, "search-ranking-group");
 		props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 		props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+		props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
+		props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, maxPollIntervalMs);
 
 		return new DefaultKafkaConsumerFactory<>(props, errorHandlingKeyDeserializer, errorHandlingValueDeserializer);
 	}
@@ -121,6 +132,7 @@ public class KafkaConsumerConfig {
 		ConcurrentKafkaListenerContainerFactory<String, OrderCompletedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
 		factory.setConsumerFactory(orderCompletedConsumerFactory);
 		factory.setCommonErrorHandler(kafkaErrorHandler);
+		factory.setConcurrency(concurrency);
 		factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 		return factory;
 	}
