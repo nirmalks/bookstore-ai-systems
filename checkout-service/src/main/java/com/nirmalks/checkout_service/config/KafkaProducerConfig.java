@@ -21,18 +21,39 @@ public class KafkaProducerConfig {
 	@Value("${spring.kafka.bootstrap-servers:localhost:9094}")
 	private String bootstrapServers;
 
+	@Value("${spring.kafka.producer.compression-type:snappy}")
+	private String compressionType;
+
+	@Value("${spring.kafka.producer.linger-ms:20}")
+	private int lingerMs;
+
+	@Value("${spring.kafka.producer.batch-size:32768}")
+	private int batchSize;
+
+	@Value("${spring.kafka.producer.delivery-timeout-ms:120000}")
+	private int deliveryTimeoutMs;
+
 	@Bean
 	public ProducerFactory<String, OrderCompletedEvent> orderCompletedProducerFactory(ObjectMapper objectMapper) {
 		Map<String, Object> props = new HashMap<>();
 		props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 		props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 		props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+
+		// Durability & Idempotence (Single-Partition Deduplication)
 		props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
 		props.put(ProducerConfig.ACKS_CONFIG, "all");
-		props.put(ProducerConfig.RETRIES_CONFIG, 3);
+		props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
+		props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, deliveryTimeoutMs);
 		props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
-		// Explicitly disable type headers to decouple producer package structure from consumers
+		// Throughput & Batching Tuning
+		props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compressionType);
+		props.put(ProducerConfig.LINGER_MS_CONFIG, lingerMs);
+		props.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
+
+		// Explicitly disable type headers to decouple producer package structure from
+		// consumers
 		JsonSerializer<OrderCompletedEvent> serializer = new JsonSerializer<>(objectMapper);
 		serializer.setAddTypeInfo(false);
 
@@ -46,4 +67,3 @@ public class KafkaProducerConfig {
 	}
 
 }
-
