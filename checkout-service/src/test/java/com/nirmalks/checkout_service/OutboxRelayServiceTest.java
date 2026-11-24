@@ -63,7 +63,7 @@ class OutboxRelayServiceTest {
 
 	@Test
 	void processOutboxEvents_recordsMetricsWhenEventsAreSent() {
-		Outbox event = new Outbox("order-1", "ORDER_CREATED", new OrderMessage(null, "saga-1", "order-1", 1L,
+		Outbox event = new Outbox("order-1", OutboxRelayService.EVENT_TYPE_ORDER_CREATED, new OrderMessage(null, "saga-1", "order-1", 1L,
 				"user@example.com", 10.0, LocalDateTime.now(), List.of(new OrderItemPayload(1L, 2))));
 		event.setId(42L);
 
@@ -80,7 +80,10 @@ class OutboxRelayServiceTest {
 			callback.accept(null);
 			return null;
 		}).when(transactionTemplate).executeWithoutResult(any());
-		when(outboxRepository.findByStatusOrderByCreatedAtAsc(eq(Outbox.EventStatus.PENDING), any(Pageable.class)))
+		when(outboxRepository.findByEventTypeAndStatusOrderByCreatedAtAsc(
+				eq(OutboxRelayService.EVENT_TYPE_ORDER_CREATED),
+				eq(Outbox.EventStatus.PENDING),
+				any(Pageable.class)))
 			.thenReturn(List.of(event));
 
 		outboxRelayService.processOutboxEvents();
@@ -103,7 +106,7 @@ class OutboxRelayServiceTest {
 
 		verify(outboxMetrics).incrementLockSkipped();
 		verify(outboxMetrics, never()).startProcessingTimer();
-		verify(outboxRepository, never()).findByStatusOrderByCreatedAtAsc(any(), any(Pageable.class));
+		verify(outboxRepository, never()).findByEventTypeAndStatusOrderByCreatedAtAsc(any(), any(), any(Pageable.class));
 	}
 
 }

@@ -63,10 +63,12 @@ public class OutboxRelayService {
 		}
 	}
 
+	public static final String EVENT_TYPE_ORDER_CREATED = "OrderCreated";
+
 	private void doProcessOutboxEvents() {
 		Timer.Sample sample = outboxMetrics.startProcessingTimer();
-		List<Outbox> events = outboxRepository.findByStatusOrderByCreatedAtAsc(Outbox.EventStatus.PENDING,
-				PageRequest.of(0, batchSize));
+		List<Outbox> events = outboxRepository.findByEventTypeAndStatusOrderByCreatedAtAsc(EVENT_TYPE_ORDER_CREATED,
+				Outbox.EventStatus.PENDING, PageRequest.of(0, batchSize));
 
 		if (events.isEmpty()) {
 			outboxMetrics.stopProcessingTimer(sample);
