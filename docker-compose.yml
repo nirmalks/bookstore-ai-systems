@@ -352,6 +352,8 @@ services:
         condition: service_started
       vault-init:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     environment:
       - JAVA_TOOL_OPTIONS=-XX:InitialRAMPercentage=25 -XX:MinRAMPercentage=20 -XX:MaxRAMPercentage=60 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError
       - SPRING_FLYWAY_USER=postgres
@@ -361,6 +363,7 @@ services:
       - SPRING_DATA_REDIS_PORT=6379
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     env_file:
       - ./vault/approles/catalog-service.env
     restart: on-failure
@@ -438,6 +441,8 @@ services:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     environment:
       - JAVA_TOOL_OPTIONS=-XX:InitialRAMPercentage=25 -XX:MinRAMPercentage=20 -XX:MaxRAMPercentage=60 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError
       - SPRING_DATASOURCE_URL=jdbc:postgresql://checkout-db:5432/bookstore_checkout_service_db
@@ -447,6 +452,7 @@ services:
       - SPRING_DATA_REDIS_PORT=6379
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     env_file:
       - ./vault/approles/checkout-service.env
     restart: on-failure
