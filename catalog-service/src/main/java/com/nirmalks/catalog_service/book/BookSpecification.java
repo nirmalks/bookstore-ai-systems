@@ -23,12 +23,12 @@ public class BookSpecification {
 	public static Specification<Book> filterBy(String searchParam, String genre, LocalDate startDate, LocalDate endDate,
 			Double minPrice, Double maxPrice, String sortBy, String sortOrder) {
 		return Specification.where(hasSearchParam(searchParam))
-			.and(hasGenre(genre))
-			.and(hasPublishedDateAfter(startDate))
-			.and(hasPublishedDateBefore(endDate))
-			.and(hasPriceGreaterThan(minPrice))
-			.and(hasPriceLessThan(maxPrice))
-			.and(sortBy(sortBy, sortOrder));
+				.and(hasGenre(genre))
+				.and(hasPublishedDateAfter(startDate))
+				.and(hasPublishedDateBefore(endDate))
+				.and(hasPriceGreaterThan(minPrice))
+				.and(hasPriceLessThan(maxPrice))
+				.and(sortBy(sortBy, sortOrder));
 	}
 
 	private static Specification<Book> hasSearchParam(String searchParam) {
@@ -75,16 +75,32 @@ public class BookSpecification {
 
 	private static Specification<Book> sortBy(String sortBy, String sortOrder) {
 		return (root, query, cb) -> {
-			if (sortBy == null || sortBy.isEmpty()) {
+			if (sortBy == null || sortBy.isBlank()) {
 				return cb.conjunction();
 			}
 
-			boolean isAscending = sortOrder == null || sortOrder.equals("asc");
-			if (isAscending) {
-				query.orderBy(cb.asc(root.get(sortBy)));
+			// Do not add ORDER BY to count queries used by pagination
+			if (query.getResultType() == Long.class || query.getResultType() == long.class) {
+				return cb.conjunction();
+			}
+
+			if ("popularity".equalsIgnoreCase(sortBy) || "purchaseCount".equalsIgnoreCase(sortBy)) {
+				boolean ascending = "asc".equalsIgnoreCase(sortOrder);
+				if (ascending) {
+					query.orderBy(cb.asc(root.get("purchaseCount")), cb.asc(root.get("id")));
+				}
+				else {
+					query.orderBy(cb.desc(root.get("purchaseCount")), cb.asc(root.get("id")));
+				}
 			}
 			else {
-				query.orderBy(cb.desc(root.get(sortBy)));
+				boolean isAscending = sortOrder == null || "asc".equalsIgnoreCase(sortOrder);
+				if (isAscending) {
+					query.orderBy(cb.asc(root.get(sortBy)), cb.asc(root.get("id")));
+				}
+				else {
+					query.orderBy(cb.desc(root.get(sortBy)), cb.asc(root.get("id")));
+				}
 			}
 			return cb.conjunction();
 		};
